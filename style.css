@@ -1,0 +1,74 @@
+/* 3D 空間網格背景 */
+.canvas-grid {
+    background-color: #f1f5f9;
+    background-image: 
+        linear-gradient(#cbd5e1 1px, transparent 1px), 
+        linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+/* 房間地板的 3D 透視 */
+.floor-3d {
+    width: 500px;
+    height: 500px;
+    background-color: white;
+    border: 8px solid #d1d5db;
+    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.25);
+    position: relative;
+    transform: rotateX(55deg) rotateZ(-15deg);
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 家具物件樣式 */
+.furniture-object {
+    position: absolute;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    transition: outline 0.1s ease;
+}
+
+.furniture-object.selected {
+    outline: 4px solid #6366f1;
+    outline-offset: 2px;
+}
+
+/* 物件庫按鈕樣式 */
+.furniture-btn {
+    width: 100%;
+    text-align: left;
+    padding: 12px;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.furniture-btn:hover {
+    background-color: #eef2ff;
+    border-color: #6366f1;
+}
+
+/* 滑桿自定義 */
+.slider {
+    width: 100%;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #4f46e5;
+    border-radius: 50%;
+}
