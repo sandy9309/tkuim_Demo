@@ -1,0 +1,24 @@
+# 依賴套件 (最重要)
+node_modules/
+
+# 建置產出
+build/
+dist/
+
+# 環境變數 (包含 API Key 或資料庫密碼，絕對不能上傳)
+.env
+.env.local
+.env.development.local
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# 編輯器設定
+.vscode/
+.idea/
+
+# 日誌檔案
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
