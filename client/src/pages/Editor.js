@@ -1,67 +1,136 @@
 import React, { useState } from 'react';
 import Scene3D from '../components/Scene3D';
+import Inventory from '../components/Inventory';
 import { COLORS } from '../styles/theme';
 
 const Editor = ({ project, setProject, onSave }) => {
-  const [form, setForm] = useState({ name: '', l: '', price: '', material: '木質' });
+  const [form, setForm] = useState({ name: '', l: '', w: '', h: '', price: '', material: '木質' });
   const [showInventory, setShowInventory] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  const addFurniture = () => {
-    if (!form.name || !form.price) return alert("請填寫資訊");
-    setProject({ ...project, items: [...project.items, { ...form, id: Date.now(), inScene: false }] });
-    setForm({ name: '', l: '', price: '', material: '木質' });
+  // --- 新增：處理專案名稱修改 ---
+  const handleProjectNameChange = (e) => {
+    setProject({ ...project, name: e.target.value });
+  };
+
+  const handleAction = () => {
+    if (!form.name || !form.l || !form.w || !form.h || !form.price) return alert("請填寫完整資訊 (含長寬高)");
+    
+    if (editingId) {
+      const updatedItems = project.items.map(item => 
+        item.id === editingId ? { ...form, id: editingId, inScene: item.inScene } : item
+      );
+      setProject({ ...project, items: updatedItems });
+      setEditingId(null);
+    } else {
+      setProject({ 
+        ...project, 
+        items: [...project.items, { ...form, id: Date.now(), inScene: false }] 
+      });
+    }
+    setForm({ name: '', l: '', w: '', h: '', price: '', material: '木質' });
+  };
+
+  const deleteFurniture = (itemId) => {
+    if (window.confirm("確定要從清單中永久刪除這件家具嗎？")) {
+      const updatedItems = project.items.filter(item => item.id !== itemId);
+      setProject({ ...project, items: updatedItems });
+      
+      if (editingId === itemId) {
+        setEditingId(null);
+        setForm({ name: '', l: '', w: '', h: '', price: '', material: '木質' });
+      }
+    }
+  };
+
+  const startEditing = (item) => {
+    setForm({ name: item.name, l: item.l, w: item.w, h: item.h, price: item.price, material: item.material });
+    setEditingId(item.id);
+  };
+
+  const toggleItemInScene = (itemId) => {
+    const items = project.items.map(i => i.id === itemId ? {...i, inScene: !i.inScene} : i);
+    setProject({...project, items});
   };
 
   return (
     <div style={styles.container}>
-      {/* 左側控制面板 (參考 image_25f682.png) */}
       <aside style={styles.sidebar}>
+        {/* --- 1. 新增：專案標題編輯區 --- */}
         <div style={styles.section}>
-          <h4 style={styles.title}>空間維度調整 </h4>
+          <h4 style={styles.title}>專案名稱</h4>
+          <input 
+            style={styles.projectNameInput} 
+            value={project.name} 
+            onChange={handleProjectNameChange}
+            placeholder="輸入專案名稱..."
+          />
+        </div>
+
+        <div style={styles.section}>
+          <h4 style={styles.title}>空間維度調整</h4>
           <div style={styles.row}>
-            <input type="number" value={project.l} style={styles.input} onChange={e => setProject({...project, l: e.target.value})} />
-            <input type="number" value={project.w} style={styles.input} onChange={e => setProject({...project, w: e.target.value})} />
+            <div style={styles.inputGroup}>
+              <span style={styles.label}>長 (cm)</span>
+              <input type="number" value={project.l} style={styles.input} onChange={e => setProject({...project, l: e.target.value})} />
+            </div>
+            <div style={styles.inputGroup}>
+              <span style={styles.label}>寬 (cm)</span>
+              <input type="number" value={project.w} style={styles.input} onChange={e => setProject({...project, w: e.target.value})} />
+            </div>
           </div>
         </div>
 
         <div style={styles.section}>
-          <h4 style={styles.title}>定義新家具 [cite: 18]</h4>
+          <h4 style={styles.title}>{editingId ? "修改家具尺寸" : "定義新家具"}</h4>
           <input placeholder="家具名稱" style={styles.input} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+          
           <div style={styles.row}>
-            <input placeholder="長" style={styles.input} value={form.l} onChange={e => setForm({...form, l: e.target.value})} />
-            <input placeholder="單價" style={styles.input} value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+            <input placeholder="長" style={styles.miniInput} value={form.l} onChange={e => setForm({...form, l: e.target.value})} />
+            <input placeholder="寬" style={styles.miniInput} value={form.w} onChange={e => setForm({...form, w: e.target.value})} />
+            <input placeholder="高" style={styles.miniInput} value={form.h} onChange={e => setForm({...form, h: e.target.value})} />
           </div>
-          <button onClick={addFurniture} style={styles.blackBtn}>新增至家具清單</button>
+          
+          <input placeholder="單價" style={styles.input} value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+          
+          <button onClick={handleAction} style={{...styles.blackBtn, backgroundColor: editingId ? COLORS.primary : COLORS.dark}}>
+            {editingId ? "確認修改尺寸" : "新增至家具清單"}
+          </button>
+          
+          {editingId && (
+            <button 
+              onClick={() => {setEditingId(null); setForm({ name: '', l: '', w: '', h: '', price: '', material: '木質' });}} 
+              style={styles.cancelBtn}
+            >
+              取消修改
+            </button>
+          )}
         </div>
 
         <div style={styles.budgetBox}>
-          <p>總預算: ${project.items.filter(i => i.inScene).reduce((s, i) => s + Number(i.price), 0)} </p>
-          <button style={styles.saveBtn} onClick={onSave}>儲存專案 </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span>預算總計:</span>
+            <span style={{ fontWeight: 'bold', color: COLORS.primary }}>
+              ${project.items.filter(i => i.inScene).reduce((s, i) => s + Number(i.price), 0)}
+            </span>
+          </div>
+          <button style={styles.saveBtn} onClick={onSave}>儲存專案</button>
         </div>
       </aside>
 
-      {/* 中間 3D 渲染區 */}
       <main style={styles.main}>
         <Scene3D roomDimensions={{l: project.l, w: project.w}} furnitureItems={project.items} />
-        
         <button style={styles.drawerBtn} onClick={() => setShowInventory(!showInventory)}>
           {showInventory ? '▶ 關閉家具列' : '◀ 開啟家具列'}
         </button>
-
         {showInventory && (
           <div style={styles.drawer}>
-            <h4>我的家具列</h4>
-            {project.items.map(item => (
-              <div key={item.id} style={styles.item}>
-                <span>{item.name}</span>
-                <button onClick={() => {
-                  const items = project.items.map(i => i.id === item.id ? {...i, inScene: !i.inScene} : i);
-                  setProject({...project, items});
-                }} style={{backgroundColor: item.inScene ? '#ef4444' : '#10b981', color: 'white', border:'none', borderRadius:'4px'}}>
-                  {item.inScene ? '移除' : '擺放'}
-                </button>
-              </div>
-            ))}
+            <Inventory 
+              items={project.items} 
+              onToggleScene={toggleItemInScene} 
+              onEdit={startEditing} 
+              onDelete={deleteFurniture} 
+            />
           </div>
         )}
       </main>
@@ -69,20 +138,37 @@ const Editor = ({ project, setProject, onSave }) => {
   );
 };
 
+// --- 更新樣式 ---
 const styles = {
   container: { display: 'flex', height: 'calc(100vh - 70px)' },
-  sidebar: { width: '320px', padding: '25px', backgroundColor: 'white', borderRight: '1px solid #eee' },
-  section: { marginBottom: '30px' },
-  title: { fontSize: '16px', color: '#64748b', marginBottom: '15px' },
-  row: { display: 'flex', gap: '10px' },
-  input: { width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' },
-  blackBtn: { width: '100%', padding: '12px', backgroundColor: COLORS.dark, color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' },
-  main: { flex: 1, padding: '20px', position: 'relative' },
-  drawerBtn: { position: 'absolute', top: '40px', right: '40px', padding: '10px 20px', backgroundColor: COLORS.primary, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', zIndex: 10 },
-  drawer: { position: 'absolute', top: '90px', right: '40px', width: '250px', backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' },
-  item: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' },
-  budgetBox: { marginTop: 'auto', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '12px' },
-  saveBtn: { width: '100%', padding: '10px', marginTop: '10px', backgroundColor: COLORS.secondary, color: 'white', border: 'none', borderRadius: '8px' }
+  sidebar: { width: '320px', padding: '25px', backgroundColor: 'white', borderRight: '1px solid #eee', display: 'flex', flexDirection: 'column', overflowY: 'auto' },
+  section: { marginBottom: '25px' },
+  title: { fontSize: '14px', fontWeight: 'bold', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  projectNameInput: {
+    width: '100%',
+    padding: '12px',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    borderRadius: '10px',
+    border: `2px solid #f1f5f9`,
+    color: COLORS.dark,
+    outline: 'none',
+    transition: '0.2s',
+    backgroundColor: '#f8fafc',
+    ':focus': { borderColor: COLORS.primary }
+  },
+  row: { display: 'flex', gap: '8px', marginBottom: '10px' },
+  inputGroup: { flex: 1 },
+  label: { fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '4px' },
+  input: { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '14px' },
+  miniInput: { width: '32%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '14px' },
+  blackBtn: { width: '100%', padding: '12px', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' },
+  cancelBtn: { width: '100%', padding: '8px', marginTop: '10px', backgroundColor: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '12px' },
+  main: { flex: 1, padding: '20px', position: 'relative', backgroundColor: '#f1f5f9' },
+  drawerBtn: { position: 'absolute', top: '40px', right: '40px', padding: '10px 20px', backgroundColor: COLORS.primary, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+  drawer: { position: 'absolute', top: '90px', right: '40px', width: '280px', backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxHeight: '70vh', overflowY: 'auto' },
+  budgetBox: { marginTop: 'auto', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '15px', border: '1px solid #e2e8f0' },
+  saveBtn: { width: '100%', padding: '12px', marginTop: '5px', backgroundColor: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }
 };
 
 export default Editor;

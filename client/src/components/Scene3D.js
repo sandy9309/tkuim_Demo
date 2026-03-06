@@ -3,35 +3,43 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 
 const Scene3D = ({ roomDimensions, furnitureItems }) => {
-  // 將公分轉換為 Three.js 的單位 (例如 100cm = 1單位)
   const scale = 0.01;
-  const length = roomDimensions.l * scale;
-  const width = roomDimensions.w * scale;
+  const roomL = Number(roomDimensions.l || 500) * scale;
+  const roomW = Number(roomDimensions.w || 400) * scale;
 
   return (
     <div style={{ width: '100%', height: '100%', backgroundColor: '#111827', borderRadius: '20px', overflow: 'hidden' }}>
       <Canvas camera={{ position: [5, 5, 5], fov: 50 }}>
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={0.7} />
         <pointLight position={[10, 10, 10]} />
         
-        {/* 1. 模擬房間地板  */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-          <planeGeometry args={[length, width]} />
+        {/* 房間地板 */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+          <planeGeometry args={[roomL, roomW]} />
           <meshStandardMaterial color="#334155" />
         </mesh>
 
-        {/* 2. 輔助網格 */}
         <Grid infiniteGrid cellSize={0.5} sectionSize={1} fadeDistance={20} />
 
-        {/* 3. 渲染已擺放的家具方塊 [cite: 18] */}
-        {furnitureItems.filter(item => item.inScene).map((item, index) => (
-          <mesh key={item.id} position={[index * 0.5 - 1, 0.25, 0]}>
-            <boxGeometry args={[0.5, 0.5, 0.5]} />
-            <meshStandardMaterial color="#3b82f6" />
-          </mesh>
-        ))}
+        {/* 渲染已擺放的家具：僅根據輸入的長、寬、高生成模型 */}
+        {furnitureItems.filter(item => item.inScene).map((item, index) => {
+          const itemL = (Number(item.l) || 50) * scale;
+          const itemW = (Number(item.w) || 50) * scale;
+          const itemH = (Number(item.h) || 40) * scale; 
+          
+          return (
+            <mesh 
+              key={item.id} 
+              // 按照順序簡單排列位置，避免重疊
+              position={[(index * 1.2) - 1, itemH / 2, 0]} 
+            >
+              <boxGeometry args={[itemW, itemH, itemL]} /> 
+              <meshStandardMaterial color="#4ade80" />
+            </mesh>
+          );
+        })}
 
-        {/* 軌道控制：讓使用者可以用滑鼠旋轉縮放視角 */}
+        {/* 僅保留視角旋轉控制 */}
         <OrbitControls />
       </Canvas>
     </div>

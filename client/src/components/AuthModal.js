@@ -91,7 +91,7 @@ const styles = {
   overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
   card: { 
     width: '400px', 
-    height: '520px', // 👈 稍微調高以容納至中後的視覺比例
+    height: '400px', // 👈 稍微調高以容納至中後的視覺比例
     backgroundColor: COLORS.modalBg, 
     borderRadius: '40px', 
     overflow: 'hidden', 
