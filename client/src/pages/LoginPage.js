@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
+import { authService } from '../api/authService';
 
 const LoginPage = ({ onLogin }) => {
-  const [isRegister, setIsRegister] = useState(false); // 切換登入/註冊
+  const [isRegister, setIsRegister] = useState(false); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // 密碼強度邏輯
   const getStrength = (pwd) => {
     if (!pwd) return { label: '未輸入', color: '#ccc', width: '5%', text: '#999' };
     let score = 0;
@@ -27,37 +28,51 @@ const LoginPage = ({ onLogin }) => {
 
   const strength = getStrength(password);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // 基礎驗證
     if (!email.includes('@')) {
       setError('❌ Email 格式不正確');
       return;
     }
 
-    if (isRegister) {
-      // 註冊專屬驗證
-      if (password.length < 6) {
-        setError('❌ 註冊密碼至少需 6 位');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('❌ 兩次密碼輸入不一致');
-        return;
-      }
-      alert('註冊成功！');
-    }
+    setLoading(true);
+    try {
+      if (isRegister) {
+        // 註冊邏輯
+        if (password.length < 6) {
+          setError('❌ 註冊密碼至少需 6 位');
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('❌ 兩次密碼輸入不一致');
+          setLoading(false);
+          return;
+        }
 
-    // 執行登入邏輯
-    onLogin({ email });
+        await authService.register(email, password);
+        alert('🎉 註冊成功！請直接登入。');
+        setIsRegister(false); 
+        setPassword('');
+        setConfirmPassword('');
+      } else {
+        // --- 修改點：正式串接登入 API ---
+        const userData = await authService.login(email, password);
+        alert('🔓 登入成功！');
+        onLogin(userData); // 將後端回傳的完整用戶資料傳回 App.js
+      }
+    } catch (err) {
+      setError(`❌ ${isRegister ? '註冊' : '登入'}失敗: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
-        {/* 頁籤切換：點擊可切換登入或註冊 */}
         <div style={styles.tabHeader}>
           <div 
             style={!isRegister ? styles.tabActive : styles.tabInactive} 
@@ -79,6 +94,7 @@ const LoginPage = ({ onLogin }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           
           <input 
@@ -88,9 +104,9 @@ const LoginPage = ({ onLogin }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
 
-          {/* 只有在註冊模式下才顯示密碼強度與確認密碼 */}
           {isRegister && (
             <>
               <div style={styles.strengthBox}>
@@ -110,15 +126,16 @@ const LoginPage = ({ onLogin }) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </>
           )}
 
-          <button type="submit" style={styles.submitBtn}>
-            {isRegister ? '立即註冊' : '登入系統'}
+          <button type="submit" style={styles.submitBtn} disabled={loading}>
+            {loading ? '連線中...' : (isRegister ? '立即註冊' : '登入系統')}
           </button>
           
-          <div style={styles.cancelText}>取消</div>
+          <div style={styles.cancelText} onClick={() => window.location.reload()}>取消</div>
         </form>
       </div>
     </div>
@@ -127,50 +144,18 @@ const LoginPage = ({ onLogin }) => {
 
 const styles = {
   overlay: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#777' },
-  card: { 
-    width: '380px', 
-    padding: '50px 35px', 
-    backgroundColor: '#e5e5e5', 
-    borderRadius: '50px', 
-    boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
-    textAlign: 'center'
-  },
+  card: { width: '380px', padding: '50px 35px', backgroundColor: '#e5e5e5', borderRadius: '50px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', textAlign: 'center' },
   tabHeader: { display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '35px' },
   tabActive: { padding: '12px 35px', backgroundColor: '#8b7e7e', borderRadius: '25px', fontWeight: 'bold', cursor: 'pointer' },
   tabInactive: { padding: '12px 35px', borderRadius: '25px', color: '#555', cursor: 'pointer' },
   form: { display: 'flex', flexDirection: 'column', gap: '15px' },
-  input: { 
-    width: '100%', 
-    padding: '16px 25px', 
-    borderRadius: '20px', 
-    border: 'none', 
-    fontSize: '16px', 
-    boxSizing: 'border-box',
-    backgroundColor: '#fff'
-  },
-  strengthBox: { 
-    width: '100%',
-    padding: '12px', 
-    backgroundColor: 'rgba(255,255,255,0.5)', 
-    borderRadius: '15px',
-    boxSizing: 'border-box'
-  },
+  input: { width: '100%', padding: '16px 25px', borderRadius: '20px', border: 'none', fontSize: '16px', boxSizing: 'border-box', backgroundColor: '#fff' },
+  strengthBox: { width: '100%', padding: '12px', backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: '15px', boxSizing: 'border-box' },
   strengthLabel: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: '#666' },
   progressBarBg: { width: '100%', height: '8px', backgroundColor: '#ddd', borderRadius: '4px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'all 0.4s ease' },
   errorTip: { color: '#ff4d4f', fontSize: '13px', fontWeight: 'bold' },
-  submitBtn: { 
-    width: '100%', 
-    padding: '18px', 
-    backgroundColor: '#0c1222', 
-    color: 'white', 
-    borderRadius: '18px', 
-    border: 'none', 
-    fontSize: '18px', 
-    fontWeight: 'bold', 
-    cursor: 'pointer',
-    marginTop: '10px'
-  },
+  submitBtn: { width: '100%', padding: '18px', backgroundColor: '#0c1222', color: 'white', borderRadius: '18px', border: 'none', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' },
   cancelText: { marginTop: '10px', color: '#888', cursor: 'pointer', fontSize: '14px' }
 };
 

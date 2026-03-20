@@ -14,26 +14,30 @@ export default function App() {
   const [currentProject, setCurrentProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // 1. 初始化改為空陣列，資料由 API 取得
+  // 1. 初始化資料由 API 取得
   const [projects, setProjects] = useState([]);
 
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('mf_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
-  // 2. 【讀取】從遠端 MySQL 抓取專案的函式
+  // 2. 【讀取】從遠端 MySQL 抓取專案
   const loadRemoteData = async () => {
     try {
       const data = await projectService.getAllProjects();
-      setProjects(data);
-      console.log("資料庫讀取成功");
+      setProjects(Array.isArray(data) ? data : []);
+      console.log("資料庫讀取成功，共有", data?.length || 0, "個專案");
     } catch (err) {
       console.error("讀取資料庫失敗:", err);
     }
   };
 
-  // 3. 【副作用】當使用者進入專案列表時，自動抓取最新資料
+  // 3. 【副作用】切換視圖時的邏輯
   useEffect(() => {
     if (view === 'projects') {
       loadRemoteData();
@@ -48,18 +52,31 @@ export default function App() {
     }
   }, [user]);
 
-  const filteredProjects = projects.filter(p => 
+  const filteredProjects = projects?.filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) || [];
 
+  // --- 核心修正：對應後端回傳的真實欄位 username ---
   const handleLogin = (userData) => {
-    const email = typeof userData === 'object' ? userData.email : userData;
+    // 💡 根據 Console 截圖，後端回傳格式為 { success: true, username: '...', ... }
+    console.log("登入成功！後端回傳資料：", userData);
+
+    // 取得帳號字串：優先抓 username，若無則看 email
+    const accountStr = userData?.username || userData?.email || (typeof userData === 'string' ? userData : '');
+    
+    // 從帳號中切出名稱 (例如：717@gmail.com -> 717)
+    const userName = (accountStr && accountStr.includes('@')) 
+      ? accountStr.split('@')[0] 
+      : (accountStr || '設計師');
+
     setUser({
-      email: email,
-      name: email.split('@')[0],
+      ...(typeof userData === 'object' ? userData : {}),
+      email: accountStr || 'user@example.com',
+      name: userName,
       avatarColor: COLORS.primary,
       bio: "尚未填寫自我介紹"
     });
+    
     setView('projects');
   };
 
@@ -68,6 +85,7 @@ export default function App() {
       setUser(null);
       setView('home');
       setCurrentProject(null);
+      localStorage.removeItem('mf_user');
     }
   };
 
@@ -75,18 +93,17 @@ export default function App() {
     setUser(prev => ({ ...prev, ...updatedData }));
   };
 
-  // 4. 【儲存】改為發送到 MySQL API
+  // 4. 【儲存】發送到 MySQL API
   const handleSaveProject = async () => {
     if (currentProject) {
       try {
-        // 格式化時間以符合 MySQL
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const projectToSave = { ...currentProject, updatedAt: now };
         
         await projectService.saveProject(projectToSave);
         
         alert(`專案「${currentProject.name}」已成功存入 MySQL 資料庫！`);
-        await loadRemoteData(); // 儲存完畢重新整理列表
+        await loadRemoteData(); 
         setView('projects');
       } catch (err) {
         alert("儲存至資料庫失敗，請檢查 ngrok 連線或欄位設定");
@@ -94,12 +111,11 @@ export default function App() {
     }
   };
 
-  // 5. 【刪除】(若後端有寫刪除 API，可在此處補上)
+  // 5. 【刪除】前端與後端同步
   const deleteProject = (id, e) => {
     e.stopPropagation();
     if (window.confirm("確定要永久刪除這個專案嗎？")) {
-      // 這裡暫時只在畫面過濾，建議請朋友補上 DELETE API
-      setProjects(projects.filter(p => p.id !== id));
+      setProjects(prev => prev.filter(p => p.id !== id));
     }
   };
 
@@ -108,12 +124,12 @@ export default function App() {
     if (customName === null) return;
 
     const newProj = {
-      id: String(Date.now()), // 轉成字串避免 MySQL 判斷出錯
+      id: String(Date.now()), 
       name: customName.trim() || `新空間 ${projects.length + 1}`,
       l: 500,
       w: 400,
       items: [],
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
     };
     
     setCurrentProject(newProj);
@@ -219,7 +235,6 @@ export default function App() {
   );
 }
 
-// 樣式保持不變
 const styles = {
   hero: { height: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' },
   heroBtn: { padding: '15px 40px', backgroundColor: COLORS.primary, color: 'white', border: 'none', borderRadius: '30px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' },
