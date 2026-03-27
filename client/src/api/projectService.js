@@ -1,50 +1,71 @@
-// 1. 設定最新的 ngrok 網址 (Base URL + /api/furnitures)
-const API_URL = "https://refulgently-unavailing-mathilda.ngrok-free.dev/api/furnitures";
+// 1. 設定基礎網址 (請確保這串 ngrok 是最新的)
+const BASE_URL = "https://refulgently-unavailing-mathilda.ngrok-free.dev/api";
+const PROJECT_URL = `${BASE_URL}/projects`;
 
 export const projectService = {
-  // 2. 從 MySQL 讀取所有專案 (GET)
-  getAllProjects: async () => {
+  // 2. 讀取功能：加入強制格式化防護
+  getAllProjects: async (userId) => {
     try {
-      const response = await fetch(API_URL, {
-        headers: {
-          // ✨ 跳過 ngrok 的警告頁面，讓 React 直接拿到 JSON
-          "ngrok-skip-browser-warning": "true"
-        }
+      const urlWithFilter = `${PROJECT_URL}?userId=${userId}`;
+      console.log("📡 正在讀取使用者專案，網址：", urlWithFilter);
+
+      const response = await fetch(urlWithFilter, {
+        headers: { "ngrok-skip-browser-warning": "true" }
       });
       
-      if (!response.ok) throw new Error("讀取資料失敗，請檢查後端是否開啟");
+      if (!response.ok) throw new Error("讀取專案失敗");
       
       const data = await response.json();
       
-      // 自動處理 MySQL 回傳的字串資料，將其轉回 React 能用的陣列格式
-      return Array.isArray(data) ? data.map(p => ({
-        ...p,
-        items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || [])
-      })) : [];
+      return Array.isArray(data) ? data.map(p => {
+        let safeItems = [];
+        try {
+          // ✨ 強力防護邏輯：解決 {"ValueKind":3} 導致的 .filter 報錯
+          if (typeof p.items === 'string') {
+            const parsed = JSON.parse(p.items);
+            // 只有解析出來確實是陣列才採用，否則給空陣列
+            safeItems = Array.isArray(parsed) ? parsed : [];
+          } else if (Array.isArray(p.items)) {
+            safeItems = p.items;
+          }
+        } catch (e) {
+          console.warn(`專案 ID ${p.id} 的 items 格式錯誤，已重置為空陣列`);
+          safeItems = []; 
+        }
+
+        return {
+          ...p,
+          items: safeItems
+        };
+      }) : [];
     } catch (error) {
-      console.error("讀取資料庫失敗:", error);
-      throw error;
+      console.error("讀取專 resonance 失敗:", error);
+      return []; 
     }
   },
 
-  // 3. 將專案儲存到 MySQL (POST)
+  // 3. 儲存功能 (新增 + 更新)：修正 JSON 傳送格式
   saveProject: async (projectData) => {
     try {
-      // 依照朋友要求：確保長寬是數字，家具清單轉為 JSON 字串
+      // ✨ 確保送往後端的資料型別完全正確
       const payload = {
-        name: projectData.name,
-        l: parseFloat(projectData.l) || 0, // 確保是數字
-        w: parseFloat(projectData.w) || 0, // 確保是數字
-        items: JSON.stringify(projectData.items), // 轉成字串存入 MySQL
+        user_id: Number(projectData.user_id),
+        name: projectData.name || "未命名專案",
+        l: Number(projectData.l) || 0,
+        w: Number(projectData.w) || 0,
+        // 確保 items 轉為 JSON 字串送出
+        items: JSON.stringify(Array.isArray(projectData.items) ? projectData.items : []),
+        updatedAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
       };
 
-      // 如果不是新建立的專案 (已有資料庫 ID)，就把 ID 傳回去更新
-      // 若是新專案，則不傳 ID 讓資料庫自動遞增 (Auto Increment)
-      if (projectData.id && String(projectData.id).length < 10) {
+      // ✨ 如果已有 ID，帶入進行更新 (UPDATE)
+      if (projectData.id) {
         payload.id = projectData.id;
       }
 
-      const response = await fetch(API_URL, {
+      console.log("🚀 準備送出儲存請求，Payload:", payload);
+
+      const response = await fetch(PROJECT_URL, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -54,14 +75,28 @@ export const projectService = {
       });
       
       if (!response.ok) {
-        // 如果報錯 405，代表朋友沒開 POST 權限
-        if (response.status === 405) throw new Error("後端未開放 POST 存檔功能 (405)");
-        throw new Error("儲存至資料庫失敗");
+        const errorDetail = await response.text();
+        throw new Error(`儲存失敗: ${errorDetail}`);
       }
-      
       return await response.json();
     } catch (error) {
       console.error("儲存失敗:", error);
+      alert("儲存失敗！請檢查後端 CORS 設定或資料庫欄位長度。");
+      throw error;
+    }
+  },
+
+  // 4. 刪除功能
+  deleteProject: async (projectId) => {
+    try {
+      const response = await fetch(`${PROJECT_URL}/${projectId}`, {
+        method: "DELETE",
+        headers: { "ngrok-skip-browser-warning": "true" }
+      });
+      if (!response.ok) throw new Error("刪除失敗");
+      return true;
+    } catch (error) {
+      console.error("刪除失敗:", error);
       throw error;
     }
   }
